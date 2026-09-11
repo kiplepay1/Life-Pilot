@@ -8,7 +8,7 @@ all in one place, with a hard architectural guarantee that account
 **administrators can manage access but can never see your personal data.**
 
 This build runs entirely on Firebase's **free Spark plan** — no billing
-account, no Cloud Functions, no paid AI API required.
+account, no Cloud Functions, no Firebase Storage, no paid AI API required.
 
 ---
 
@@ -23,7 +23,7 @@ account, no Cloud Functions, no paid AI API required.
 | Subscriptions | Monthly/annual cost rollups, upcoming renewals |
 | Savings | Goal tracking with progress bars |
 | Life Admin | Tasks (priority/status) and vehicles (insurance/road tax/service alerts) |
-| Documents | Expiry-tracked documents with optional file upload to Firebase Storage |
+| Documents | Expiry-tracked document records (name, category, expiry date, notes) — no file attachments in this build |
 | Reports | Financial Health Score (0–100) with strengths/warnings/recommendations, report catalog |
 | Notifications | In-app notification center |
 | Settings | Profile, currency, password reset, privacy explanation |
@@ -37,13 +37,12 @@ account, no Cloud Functions, no paid AI API required.
 Browser (React SPA)
    │
    ├─ Firebase Auth (email/password)
-   ├─ Firestore (direct reads/writes, gated by firestore.rules)
-   └─ Firebase Storage (direct reads/writes, gated by storage.rules)
+   └─ Firestore (direct reads/writes, gated by firestore.rules)
 ```
 
-No Cloud Functions, no server component, no external AI API — everything
-runs client-side against Firebase, which is why this fits entirely inside
-the free Spark plan.
+No Cloud Functions, no Firebase Storage, no server component, no
+external AI API — everything runs client-side against Firestore, which
+is why this fits entirely inside the free Spark plan.
 
 **The core privacy guarantee is enforced at the data layer, not the UI:**
 `firestore.rules` gives a user's personal subcollections (`income`,
@@ -58,24 +57,34 @@ in `firestore.rules`).
 ### Why there's no Cloud Functions here
 
 Firebase's free Spark plan does not allow Cloud Functions to run at all —
-they require the pay-as-you-go **Blaze** plan (which has a large free
-quota, but does require a card on file). Two features were originally
-built around Cloud Functions and have been reworked to avoid needing them:
+they require the pay-as-you-go **Blaze** plan. Two features were
+originally built around Cloud Functions and have been reworked to avoid
+needing them:
 
-1. **Admin actions** (approve/reject/suspend/reactivate) now write
-   directly to Firestore from the browser, permitted by a narrow rule
-   (`adminOnlyTouchesAccountFields()`) that still only lets an admin touch
-   status fields — never personal data.
-2. **AI Advisor** now answers using `src/ai/localAdvisor.ts`, which
+1. **Admin actions** (approve/reject/suspend/reactivate) write directly
+   to Firestore from the browser, permitted by a narrow rule
+   (`adminOnlyTouchesAccountFields()`) that still only lets an admin
+   touch status fields — never personal data.
+2. **AI Advisor** answers using `src/ai/localAdvisor.ts`, which
    calculates a real answer from your own already-loaded Firestore data
    (spending by category, upcoming bills, subscription cost, savings
-   rate, etc.) instead of calling an external language model. It's more
-   limited than a real LLM, but transparent about that, and it never
-   invents numbers.
+   rate, etc.) instead of calling an external language model.
 
-If you later want the real Gemini-backed advisor and Cloud-Function-based
-admin actions, that version of this architecture is straightforward to
-add back on top of Blaze — ask for it if you want the walkthrough.
+### Why there's no Firebase Storage here
+
+As of late 2024, provisioning a Firebase Storage bucket requires the
+Blaze plan even if actual usage stays at $0 — Spark projects can't
+create a bucket at all. Rather than require billing just to store a few
+document records, the Documents feature tracks document name, category,
+expiry date and notes directly in Firestore, without file attachments.
+`storage.rules` is still included in the repo (unused/not deployed) in
+case you upgrade to Blaze later and want to restore uploads — see the
+comment at the top of that file for what to re-enable.
+
+If you later want the real Gemini-backed advisor, Cloud-Function-based
+admin actions, and file uploads, that version of this architecture is
+straightforward to add back on top of Blaze — ask for it if you want
+the walkthrough.
 
 ---
 
@@ -92,7 +101,7 @@ lifepilot/
 │   ├── contexts/         AuthContext (Firebase auth + profile + isAdmin field)
 │   ├── services/         useCollection — generic per-user Firestore CRUD hook
 │   ├── ai/               localAdvisor.ts — local, cost-free AI Advisor logic
-│   ├── firebase/         config.ts (client SDK init)
+│   ├── firebase/         config.ts (client SDK init — Auth + Firestore only)
 │   ├── types/            Shared TypeScript types
 │   ├── constants/        Nav items, category lists, chart colors
 │   └── utils/            formatCurrency, formatDate, daysUntil, classNames
@@ -102,7 +111,7 @@ lifepilot/
 │                         not part of the core no-terminal setup)
 ├── .github/workflows/deploy.yml   Builds and deploys automatically on push
 ├── firestore.rules
-├── storage.rules
+├── storage.rules         Kept for reference; not deployed in this build
 ├── firebase.json
 ├── firestore.indexes.json
 └── .env.example
@@ -131,20 +140,19 @@ cp .env.example .env    # fill in your Firebase web app config (see §5)
 1. Create a project at https://console.firebase.google.com.
 2. **Authentication** → Sign-in method → enable **Email/Password**.
 3. **Firestore Database** → Create database (production mode).
-4. **Storage** → Get started (production mode).
-5. **Project settings** → General → "Your apps" → add a **Web app** →
+4. **Project settings** → General → "Your apps" → add a **Web app** →
    copy the config values into `.env` as `VITE_FIREBASE_*`.
-6. Rename `.firebaserc.example` to `.firebaserc` and set your project ID:
+5. Rename `.firebaserc.example` to `.firebaserc` and set your project ID:
    ```json
    { "projects": { "default": "your-firebase-project-id" } }
    ```
 
-None of the above requires the Blaze plan or a billing account.
+Deliberately skipped: enabling Firebase Storage (requires Blaze — see §2).
 
-### Firestore & Storage rules
+### Firestore rules
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,storage
+firebase deploy --only firestore:rules,firestore:indexes
 ```
 
 (Or let the GitHub Actions workflow do this for you on push — see §7.)
@@ -174,18 +182,20 @@ themselves through the app.
 1. Push this project to a GitHub repository.
 2. Repo → Settings → Secrets and variables → Actions → add one secret for
    each: `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`,
-   `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`,
-   `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` (values
-   from §5.5 above).
+   `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID`,
+   `VITE_FIREBASE_APP_ID` (values from §5.4 above).
 3. Firebase Console → Project Settings → Service Accounts → "Generate new
    private key" → downloads a JSON file. Add its entire contents as one
    more secret named `FIREBASE_SERVICE_ACCOUNT`, then delete the local
    copy of that file.
-4. Push any commit to `main` — the "Build and Deploy LifePilot" workflow
-   in `.github/workflows/deploy.yml` builds the app and deploys Hosting,
-   Firestore rules, and Storage rules automatically. Watch it run under
-   the repo's "Actions" tab.
-5. Your app is live at `https://YOUR-PROJECT-ID.web.app`.
+4. Google Cloud Console → IAM & Admin → IAM → find that same service
+   account (ends in `@your-project.iam.gserviceaccount.com`) → grant it
+   the **Editor** role, so it can enable APIs and deploy Hosting/Firestore.
+5. Push any commit to `main` — the "Build and Deploy LifePilot" workflow
+   in `.github/workflows/deploy.yml` builds the app and deploys Hosting
+   and Firestore rules automatically. Watch it run under the repo's
+   "Actions" tab.
+6. Your app is live at `https://YOUR-PROJECT-ID.web.app`.
 
 ## 8. Local development
 
@@ -205,7 +215,7 @@ GOOGLE_APPLICATION_CREDENTIALS=./serviceAccountKey.json \
 
 ```bash
 npm run build                                   # tsc -b && vite build → dist/
-firebase deploy --only hosting,firestore:rules,storage
+firebase deploy --only hosting,firestore:rules
 ```
 
 ---
@@ -225,19 +235,19 @@ users/{uid}/savings/{id}               │ for any of these, anywhere in
 users/{uid}/transactions/{id}          │ firestore.rules.
 users/{uid}/tasks/{id}                 │
 users/{uid}/vehicles/{id}              │
-users/{uid}/documents/{id}             │
+users/{uid}/documents/{id}             │ (record only — no file, see §2)
 users/{uid}/notifications/{id}         │
 users/{uid}/aiConversations/{id}       │
 users/{uid}/reports/{id}              ─┘
 ```
 
-Storage mirrors this: `users/{uid}/documents/{fileName}`, owner-only.
+There is no Storage bucket in this build (see §2).
 
 ---
 
 ## 11. Security model
 
-Enforced in `firestore.rules` / `storage.rules`, not just hidden in the UI:
+Enforced in `firestore.rules`, not just hidden in the UI:
 
 - **Isolation**: every personal read/write requires `request.auth.uid == uid`.
 - **Admin boundary**: admin status is a plain `isAdmin` boolean field on a
@@ -254,9 +264,6 @@ Enforced in `firestore.rules` / `storage.rules`, not just hidden in the UI:
   calculation over data the browser already legitimately holds, there's
   no API key, server, or third-party data flow to secure in the first
   place.
-- **Storage**: uploads are capped at 15MB and restricted to
-  `image/*` / `application/pdf`; only the owning UID's path is readable or
-  writable.
 
 ### Security review (see original prompt's checklist)
 
@@ -268,10 +275,10 @@ Enforced in `firestore.rules` / `storage.rules`, not just hidden in the UI:
 | 4 | Can the admin read user financial data? | No — no admin rule exists for any personal subcollection. |
 | 5 | Can the admin read AI conversations? | No — same as above; `aiConversations` has no admin rule either. |
 | 6 | Can frontend JS access an AI provider's credentials? | N/A in this build — there is no external AI call to secure a key for. |
-| 7 | Can an unauthenticated user access private pages? | No — `RequireApprovedUser`/`RequireAdmin` redirect to `/login`, and Firestore/Storage rules independently reject unauthenticated reads regardless of the UI. |
+| 7 | Can an unauthenticated user access private pages? | No — `RequireApprovedUser`/`RequireAdmin` redirect to `/login`, and Firestore rules independently reject unauthenticated reads regardless of the UI. |
 | 8 | Can a suspended user continue accessing protected functionality? | Partially mitigated: `RequireApprovedUser` blocks the UI on next profile load. Firestore rules do not currently re-check `status` on every personal-data read (see Known limitations) — a suspended user's already-open session could keep reading/writing their own data client-side until they're routed out or their token session ends. |
 | 9 | Can the frontend spoof another UID? | No — every Firestore read/write is scoped through `useCollection`, which always uses the signed-in user's own UID from Firebase Auth, never a value from anywhere else. |
-| 10 | Can Storage files be accessed by another user? | No — `storage.rules` scopes read/write/delete to `request.auth.uid == uid` on the file's own path. |
+| 10 | Can files be accessed by another user? | N/A in this build — there is no file storage to secure. |
 | 11 | Can a user manipulate another user's Firestore document? | No — same owner-only rule as #1/#2, plus `/users/{uid}` writes are further restricted by field-diffing (`adminOnlyTouchesAccountFields()`), so even the admin can't rewrite arbitrary profile fields. |
 
 ---
@@ -281,17 +288,25 @@ Enforced in `firestore.rules` / `storage.rules`, not just hidden in the UI:
 - **"Firebase config is missing" console warning** — copy `.env.example` to
   `.env` (or fill in the matching GitHub Secrets) with your Firebase web
   app config.
-- **`permission-denied` in the console** — check that `firestore.rules` /
-  `storage.rules` have actually been deployed, and that the account's
-  `status` is `approved`.
+- **`permission-denied` in the console** — check that `firestore.rules`
+  has actually been deployed, and that the account's `status` is
+  `approved`.
 - **Admin Portal not showing up** — the `isAdmin` field change only takes
   effect on your next profile load; sign out and back in after editing it
   in the Firebase Console.
-- **GitHub Actions deploy fails on the first run** — occasionally Google
-  Cloud needs the Firestore/Storage APIs explicitly enabled on a brand
-  new project. If the Actions log mentions an API being disabled, search
-  for that API's name in Google Cloud Console and click "Enable", then
-  re-push.
+- **GitHub Actions deploy fails with a service-account JSON parsing
+  error** — the file got corrupted by an editor changing its encoding.
+  Re-download it from Firebase Console → Project Settings → Service
+  Accounts, and copy its contents by dragging the file into a browser
+  tab and copying the rendered text, rather than through Notepad.
+- **GitHub Actions deploy fails with a 403 / permission-denied calling
+  Google APIs** — the service account needs the **Editor** role. Google
+  Cloud Console → IAM & Admin → IAM → find the service account → edit →
+  add role → Editor.
+- **"Firebase Storage has not been set up" or "upgrade to Blaze" errors**
+  — expected if something still references Storage; this build shouldn't
+  call it at all. Make sure `firebase.json` has no `"storage"` key and
+  the deploy workflow's `--only` list doesn't include `storage`.
 
 ---
 
@@ -307,9 +322,9 @@ Enforced in `firestore.rules` / `storage.rules`, not just hidden in the UI:
   matches your question against a set of known patterns (spending review,
   savings-rate check, bill lookup, etc.) and calculates a real answer
   from your own data, but it can't handle open-ended or novel questions
-  the way an LLM would. Swapping in a real Gemini-backed advisor later
-  requires Cloud Functions (Blaze plan) — see §2 "Why there's no Cloud
-  Functions here."
+  the way an LLM would.
+- **No file attachments for Documents**: tracks name/category/expiry/notes
+  only, since Firebase Storage requires Blaze (see §2).
 - **Admin metrics (AI Requests / Active Users)**: not tracked in this
   build (no usage-logging pipeline), shown as "—" rather than a
   fabricated number.
@@ -331,5 +346,5 @@ Enforced in `firestore.rules` / `storage.rules`, not just hidden in the UI:
 ## Technology stack
 
 **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide React, Recharts, React Router
-**Backend**: Firebase Authentication, Cloud Firestore, Firebase Storage — all on the free Spark plan
+**Backend**: Firebase Authentication, Cloud Firestore — free Spark plan
 **Deployment**: Firebase Hosting, deployed automatically via GitHub Actions

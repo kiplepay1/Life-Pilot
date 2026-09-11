@@ -1,5 +1,14 @@
 rules_version = '2';
 
+// NOTE: This file is currently NOT deployed by .github/workflows/deploy.yml
+// or referenced in firebase.json. Firebase Storage requires the paid
+// Blaze plan to provision a bucket at all (even for $0 actual usage),
+// so this build's Documents feature tracks records without file
+// uploads and skips Storage entirely. These rules are kept here, ready
+// to re-enable (add "storage": { "rules": "storage.rules" } back into
+// firebase.json and "storage" back into the deploy --only list) if you
+// upgrade to Blaze later and want to restore file attachments.
+
 // ═══════════════════════════════════════════════════════════════════════
 // LIFEPILOT — STORAGE SECURITY RULES
 //

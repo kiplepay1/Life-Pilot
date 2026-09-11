@@ -1,8 +1,5 @@
 import { useState } from 'react'
-import { Plus, Trash2, FileText, Download, AlertTriangle } from 'lucide-react'
-import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
-import { storage } from '@/firebase/config'
-import { useAuth } from '@/contexts/AuthContext'
+import { Plus, Trash2, FileText, AlertTriangle } from 'lucide-react'
 import { useCollection } from '@/services/useCollection'
 import DataTable, { Column } from '@/components/DataTable'
 import Modal from '@/components/Modal'
@@ -25,48 +22,27 @@ function expiryStatus(expiryDate?: string): 'valid' | 'expiring' | 'expired' | n
 }
 
 export default function Documents() {
-  const { firebaseUser } = useAuth()
   const docs = useCollection<UserDocument>('documents', 'createdAt')
   const { push } = useToast()
   const [modalOpen, setModalOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<UserDocument | null>(null)
-  const [uploading, setUploading] = useState(false)
   const [form, setForm] = useState({ documentName: '', category: 'Other' as DocumentCategory, expiryDate: '', notes: '' })
-  const [file, setFile] = useState<File | null>(null)
 
   async function handleAdd(e: React.FormEvent) {
     e.preventDefault()
-    if (!firebaseUser) return
-    setUploading(true)
     try {
-      let fileUrl: string | undefined
-      let filePath: string | undefined
-      if (file) {
-        // Path is scoped under the current user's own UID — Storage
-        // rules independently reject any other path for this user.
-        filePath = `users/${firebaseUser.uid}/documents/${Date.now()}-${file.name}`
-        const storageRef = ref(storage, filePath)
-        await uploadBytes(storageRef, file)
-        fileUrl = await getDownloadURL(storageRef)
-      }
-      await docs.add({ ...form, fileUrl, filePath } as any)
+      await docs.add(form as any)
       push('Document added.', 'success')
       setModalOpen(false)
       setForm({ documentName: '', category: 'Other', expiryDate: '', notes: '' })
-      setFile(null)
     } catch (err: any) {
       push(err?.message ?? 'Could not save document.', 'error')
-    } finally {
-      setUploading(false)
     }
   }
 
   async function confirmDelete() {
     if (!deleteTarget) return
     try {
-      if (deleteTarget.filePath) {
-        await deleteObject(ref(storage, deleteTarget.filePath)).catch(() => undefined)
-      }
       await docs.remove(deleteTarget.id)
       push('Document deleted.', 'success')
     } catch (err: any) {
@@ -93,16 +69,9 @@ export default function Documents() {
       key: 'actions',
       header: '',
       render: (r) => (
-        <div className="flex items-center gap-3">
-          {r.fileUrl && (
-            <a href={r.fileUrl} target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand-600" aria-label="Download">
-              <Download className="h-4 w-4" />
-            </a>
-          )}
-          <button onClick={() => setDeleteTarget(r)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
+        <button onClick={() => setDeleteTarget(r)} className="text-slate-400 hover:text-red-600" aria-label="Delete">
+          <Trash2 className="h-4 w-4" />
+        </button>
       ),
     },
   ]
@@ -144,21 +113,14 @@ export default function Documents() {
           <TextField label="Document name" value={form.documentName} onChange={(v) => setForm((f) => ({ ...f, documentName: v }))} required placeholder="e.g. Passport" />
           <SelectField label="Category" value={form.category} onChange={(v) => setForm((f) => ({ ...f, category: v as DocumentCategory }))} options={DOCUMENT_CATEGORIES} />
           <TextField label="Expiry date (optional)" type="date" value={form.expiryDate} onChange={(v) => setForm((f) => ({ ...f, expiryDate: v }))} />
-          <div>
-            <label className="label">File (optional, PDF or image, max 15MB)</label>
-            <input
-              type="file"
-              accept="application/pdf,image/*"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-50 file:px-4 file:py-2 file:text-sm file:font-medium file:text-brand-700 hover:file:bg-brand-100"
-            />
-          </div>
           <TextField label="Notes (optional)" value={form.notes} onChange={(v) => setForm((f) => ({ ...f, notes: v }))} />
+          <p className="text-xs text-slate-400">
+            File attachments aren't available in this build (Firebase Storage requires the paid Blaze plan) — this
+            tracks the document's name, category and expiry date only.
+          </p>
           <div className="flex justify-end gap-2 pt-2">
             <button type="button" className="btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>
-            <button type="submit" disabled={uploading} className="btn-primary">
-              {uploading ? 'Saving…' : 'Save document'}
-            </button>
+            <button type="submit" className="btn-primary">Save document</button>
           </div>
         </form>
       </Modal>
@@ -166,7 +128,7 @@ export default function Documents() {
       <ConfirmDialog
         open={!!deleteTarget}
         title="Delete document"
-        message="Are you sure you want to delete this document? Its file, if any, will also be removed."
+        message="Are you sure you want to delete this document record?"
         confirmLabel="Delete"
         danger
         onConfirm={confirmDelete}
