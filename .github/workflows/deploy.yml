@@ -1,0 +1,53 @@
+name: Build and Deploy Platz Budget
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build frontend
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+        run: npm run build
+
+      - name: Authenticate to Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # 100%-free-tier deployment: Hosting and Firestore rules both run
+      # on the Spark plan with no billing account needed. Storage is
+      # deliberately NOT deployed here — creating a Storage bucket now
+      # requires the paid Blaze plan even for $0 usage, so this build
+      # doesn't use Firebase Storage at all (see README "Why there's no
+      # Firebase Storage here").
+      - name: Deploy to Firebase (Hosting, Firestore rules)
+        run: |
+          npx firebase-tools@13 deploy \
+            --only hosting,firestore:rules,firestore:indexes \
+            --project "${{ secrets.VITE_FIREBASE_PROJECT_ID }}" \
+            --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
