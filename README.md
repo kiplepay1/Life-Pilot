@@ -1,0 +1,200 @@
+# Platz Budget
+
+**Personal finance + GrabCar weekend driver intelligence.**
+
+Platz Budget evolved from the LifePilot codebase — same Firebase Auth,
+approval workflow, admin portal, and Firestore security model, now
+purpose-built around your salary, fixed commitments, Grab driving, and
+net worth, instead of generic personal life admin.
+
+Runs entirely on Firebase's **free Spark plan** — no billing account, no
+Cloud Functions, no Firebase Storage, no paid AI API required.
+
+---
+
+## 1. What's in it
+
+| Area | What it does |
+|---|---|
+| Dashboard | Salary, Fixed Commitments, Variable Expenses, Grab Gross/Net, Available Cash, Savings, Net Worth — plus a 3/6/12-month chart |
+| Drive Smart AI | Calculation-based advisor covering both general finances and Grab-specific questions (target progress, Saturday vs Sunday, RM/hour) |
+| Money | Income and variable expense tracking by category |
+| Commitments (Bills) | Your fixed monthly commitments — house, car, insurance, etc. |
+| Subscriptions | Recurring services |
+| Savings | Goals, what-if scenarios by Grab-gross assumption, and a toggleable Future Rental Scenario |
+| **Grab Driver** | New module — Performance hub, fast session entry, history, Saturday-vs-Sunday analytics, area/long-ride analytics, manual demand log, fuel wallet, target planner |
+| **Assets** | Property, vehicles, investments, cash — feeds Net Worth |
+| **Liabilities** | Loans and financing — feeds Net Worth |
+| Life Admin | Tasks and vehicles |
+| Documents | Expiry-tracked document records (no file attachments — see below) |
+| Reports | Financial Health Score, Monthly Grab Report, report catalog |
+| Notifications, Settings, Admin Portal | Unchanged from LifePilot, with a new Financial Settings section in Settings |
+
+---
+
+## 2. What's unchanged from LifePilot (by design)
+
+Per the brief, the entire authentication/security architecture is
+untouched:
+
+- Firebase Auth (email/password), registration, pending-approval flow
+- `RequireApprovedUser`, `RequireAdmin`, `RedirectIfAuthed` route guards
+- Admin status as a plain `isAdmin` Firestore field (no custom claims,
+  no Cloud Functions) — set by hand in the Firebase Console
+- The privacy guarantee: every personal collection is owner-only in
+  `firestore.rules`, with **no admin access rule at all** for any of
+  them — including the new `grabSessions`, `grabTrips`,
+  `demandObservations`, `fuelLogs`, `assets`, `liabilities`, and
+  `settings` collections added for Platz Budget
+- Financial settings (salary, Grab targets, future-scenario config)
+  live in `/users/{uid}/settings/financial` — a subcollection with no
+  admin rule — rather than on the admin-readable `/users/{uid}` profile
+  doc, so even your configured numbers stay fully private
+
+## 3. Why no Cloud Functions, Storage, or paid AI
+
+Same reasoning as the LifePilot build this evolved from:
+
+- **Cloud Functions** require the paid Blaze plan. Admin
+  approve/reject/suspend/reactivate write directly to Firestore from
+  the browser instead, permitted by a narrow rule
+  (`adminOnlyTouchesAccountFields()`).
+- **Firebase Storage** now requires Blaze even for $0 usage, so
+  Documents tracks records (name/category/expiry/notes) without file
+  uploads.
+- **Drive Smart AI** is calculation-based (`src/ai/localAdvisor.ts`),
+  matching your question against known patterns and computing a real
+  answer from your own already-loaded data — no Gemini call, no API
+  key, no cost, and it never guarantees future earnings.
+
+---
+
+## 4. New Firestore collections
+
+```
+users/{uid}/grabSessions/{id}        — one entry per driving session
+users/{uid}/grabTrips/{id}           — individual trips (area & long-ride analytics)
+users/{uid}/demandObservations/{id}  — manual "Live Demand" notes only, never scraped
+users/{uid}/fuelLogs/{id}            — fuel spending beyond the Shell allowance
+users/{uid}/assets/{id}
+users/{uid}/liabilities/{id}
+users/{uid}/settings/financial       — single doc: salary, Grab target, future scenario
+```
+
+All owner-only, same pattern as every existing LifePilot collection —
+see `firestore.rules`.
+
+## 5. Grab Driver module
+
+- **New Session** (`/grab/session`) — fast mobile entry: Date, Start,
+  End, Trips, KM, Gross are the only required fields; Fuel, Toll,
+  Parking, Bonus, Tips, Driving hours and Notes are tucked behind an
+  "Advanced" toggle. Online hours and day type (Saturday/Sunday) are
+  computed automatically from your start/end time and date.
+- **Performance** (`/grab`) — current-month target progress bar,
+  remaining amount, required RM per remaining planned session, and
+  core KPIs.
+- **History** (`/grab/history`) — every session, with RM/hour computed
+  per row.
+- **Sat vs Sun** (`/grab/analytics`) — side-by-side averages plus an
+  RM/hour trend line across all logged sessions.
+- **Areas & Demand** (`/grab/areas`) — three tabs: Area Analytics
+  (aggregated by pickup area from logged trips), Long Rides (filterable
+  at 20/30/40/50km+), and Live Demand (manual observations, always
+  labelled as such — never scraped, never automated).
+- **Fuel Wallet** (`/grab/fuel`) — your Shell allowance vs. fuel logged
+  on sessions plus any extra fuel spending once it's exhausted.
+- **Targets** (`/grab/targets`) — configure your monthly target,
+  planned Saturdays/Sundays, hours per session, and maintenance
+  reserve %; shows the resulting per-week/per-Saturday/per-Sunday/
+  per-hour breakdown.
+
+All formulas match the brief:
+`Net Income = Gross + Tips + Bonus − Fuel − Toll − Parking − Other`,
+`RM/hour = Net Income / Online Hours`, `RM/km = Net Income / Total KM`,
+`RM/trip = Gross / Trips`, `Trips/hour = Trips / Online Hours` — see
+`src/utils/grab.ts`.
+
+---
+
+## 6. Installation
+
+```bash
+git clone <your-repo-url> platz-budget
+cd platz-budget
+npm install
+cp .env.example .env    # fill in your Firebase web app config
+```
+
+> **No local terminal?** Push to GitHub, add the 5 `VITE_FIREBASE_*`
+> secrets plus `FIREBASE_SERVICE_ACCOUNT` as repository secrets, and
+> `.github/workflows/deploy.yml` builds and deploys automatically on
+> push to `main`.
+
+## 7. Firebase configuration
+
+1. Create a project at console.firebase.google.com.
+2. Authentication → Sign-in method → enable Email/Password.
+3. Firestore Database → Create database (**production mode** — this is
+   a security setting, not a paid tier).
+4. Project settings → General → "Your apps" → add a Web app → copy the
+   config into `.env` as `VITE_FIREBASE_*`.
+5. Deploy rules: `firebase deploy --only firestore:rules,firestore:indexes`
+   (or let GitHub Actions do it — see `.github/workflows/deploy.yml`).
+
+## 8. Admin & first-time setup
+
+Same as LifePilot: register an account, then in Firebase Console →
+Firestore Database → Data → `users/{your-uid}`, set `isAdmin` to
+`true` and `status` to `approved` by hand, then sign out and back in.
+
+After that, set your real numbers in **Settings** (salary, Shell
+allowance) and **Grab Targets** (`/grab/targets` — monthly target,
+planned sessions, maintenance reserve) — these replace what would
+otherwise be hardcoded defaults.
+
+## 9. Local development / build
+
+```bash
+npm run dev              # http://localhost:5173
+npm run build             # tsc -b && vite build → dist/
+```
+
+---
+
+## 10. Security review
+
+| # | Question | Result |
+|---|---|---|
+| Can User A read User B's Grab sessions / assets / liabilities? | No — every new collection follows the same `request.auth.uid == uid` owner-only rule as the original LifePilot collections. |
+| Can the admin read Grab sessions, financial settings, or net worth data? | No — no admin rule exists for `grabSessions`, `grabTrips`, `demandObservations`, `fuelLogs`, `assets`, `liabilities`, or `settings`. |
+| Can a user set `isAdmin` on themselves? | No — unchanged from LifePilot; the owner-update rule rejects it. |
+| Can frontend JS access AI provider credentials? | N/A — Drive Smart AI is local calculation, no external call. |
+| Is "Live Demand" ever scraped or automated? | No — `demandObservations` is manual-entry only, by design, and the UI always labels it "manual demand observation". |
+
+---
+
+## 11. Known limitations
+
+- **Fixed Commitments assumed constant across the historical chart** —
+  the Dashboard's 3/6/12-month chart applies your *current* total
+  monthly commitments to every past month shown, since Bills doesn't
+  track a history of amount changes over time.
+- **Net Worth / Savings shown as a flat snapshot on the trend chart** —
+  Assets and Liabilities are point-in-time; there's no historical
+  net-worth tracking yet, so those two trend options repeat the current
+  figure across the period (noted in-app).
+- **Demo seed script not yet updated for Grab/Assets/Liabilities data**
+  — `scripts/seedDemoData.ts` still seeds the original LifePilot
+  categories only.
+- Everything inherited from the original LifePilot build still applies
+  too: no file attachments (Storage requires Blaze), no PDF/CSV export,
+  no auto-generated notifications, calculation-based (not LLM-based) AI.
+
+---
+
+## Technology stack
+
+**Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide React, Recharts, React Router
+**Backend**: Firebase Authentication, Cloud Firestore — free Spark plan
+**Deployment**: Firebase Hosting, via GitHub Actions
