@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { collection, deleteField, doc, onSnapshot, query, updateDoc } from 'firebase/firestore'
-import { ShieldCheck, Users, Clock, CheckCircle2, ShieldOff, Sparkles, Activity } from 'lucide-react'
+import { ShieldCheck, Users, Clock, CheckCircle2, ShieldOff, Activity } from 'lucide-react'
 import { db } from '@/firebase/config'
 import { useAuth } from '@/contexts/AuthContext'
 import MetricCard from '@/components/MetricCard'
@@ -148,17 +148,16 @@ export default function Admin() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
         <MetricCard label="Total Users" value={String(counts.total)} icon={Users} accent="brand" />
         <MetricCard label="Pending Approvals" value={String(counts.pending)} icon={Clock} accent="amber" />
         <MetricCard label="Approved Users" value={String(counts.approved)} icon={CheckCircle2} accent="green" />
         <MetricCard label="Suspended Users" value={String(counts.suspended)} icon={ShieldOff} accent="red" />
-        <MetricCard label="AI Requests" value="—" icon={Sparkles} accent="brand" />
         <MetricCard label="Active Users" value="—" icon={Activity} accent="brand" />
       </div>
       <p className="-mt-3 text-xs text-slate-400">
-        AI Requests and Active Users require a separate usage-metrics pipeline (e.g. logging invocation counts in
-        Cloud Functions) which is not wired up in this build — shown as “—” rather than a fabricated number.
+        Active Users requires a separate usage-metrics pipeline (e.g. logging sign-ins) which is not wired up in
+        this build — shown as "—" rather than a fabricated number.
       </p>
 
       <DataTable columns={columns} rows={users as any} rowKey={(r) => r.uid} emptyMessage="No registered users yet." />

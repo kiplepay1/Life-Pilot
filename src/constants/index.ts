@@ -1,9 +1,7 @@
 import {
   LayoutDashboard,
-  Sparkles,
   Wallet,
   Receipt,
-  Repeat,
   PiggyBank,
   ClipboardList,
   FileText,
@@ -21,10 +19,8 @@ export const APP_TAGLINE = 'Personal finance + GrabCar driver intelligence.'
 
 export const NAV_ITEMS = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/ai-advisor', label: 'Drive Smart AI', icon: Sparkles },
   { to: '/money', label: 'Money', icon: Wallet },
-  { to: '/bills', label: 'Commitments', icon: Receipt },
-  { to: '/subscriptions', label: 'Subscriptions', icon: Repeat },
+  { to: '/commitments', label: 'Commitments', icon: Receipt },
   { to: '/savings', label: 'Savings', icon: PiggyBank },
   { to: '/grab', label: 'Grab Driver', icon: Car },
   { to: '/assets', label: 'Assets', icon: Landmark },
@@ -52,15 +48,11 @@ export const GRAB_NAV_ITEMS = [
 export const EXPENSE_CATEGORIES = [
   'Food',
   'Transport',
-  'Housing',
-  'Utilities',
   'Shopping',
   'Entertainment',
   'Education',
   'Healthcare',
   'Family',
-  'Insurance',
-  'Subscriptions',
   'Other',
 ] as const
 
@@ -86,18 +78,3 @@ export const DEMAND_LEVELS = ['Low', 'Medium', 'High', 'Very High'] as const
 export const LONG_RIDE_THRESHOLDS = [20, 30, 40, 50] as const
 
 export const CHART_COLORS = ['#4f46e5', '#818cf8', '#22c55e', '#f59e0b', '#ef4444', '#06b6d4', '#a855f7', '#ec4899']
-
-export const AI_SUGGESTED_PROMPTS = [
-  'Review my spending',
-  'Where can I save money?',
-  'Am I on track this month?',
-  'What bills are coming up?',
-  'Can I afford this purchase?',
-  'How much can I save in 6 months?',
-  'Review my subscriptions',
-  'Give me a plan for this month',
-  'Am I on track for my Grab target?',
-  'How much do I need per session?',
-  'Is Sunday driving worth it?',
-  "What's my net worth?",
-]

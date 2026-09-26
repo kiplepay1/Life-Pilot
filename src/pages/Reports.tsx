@@ -4,18 +4,13 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useCollection } from '@/services/useCollection'
 import { LoadingState } from '@/components/States'
 import { formatCurrency } from '@/utils/format'
-import { aggregateSessions, thisMonthSessions } from '@/utils/grab'
-import type { Income, Expense, Bill, SavingsGoal, FinancialHealthScore, GrabSession } from '@/types'
-
-function monthKey(iso: string) {
-  const d = new Date(iso)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
-}
+import { aggregateSessions, thisMonthSessions, monthKey } from '@/utils/grab'
+import type { Income, Expense, Commitment, SavingsGoal, FinancialHealthScore, GrabSession } from '@/types'
 
 function computeHealthScore(
   income: Income[],
   expenses: Expense[],
-  bills: Bill[],
+  commitments: Commitment[],
   savings: SavingsGoal[]
 ): FinancialHealthScore {
   const thisMonth = monthKey(new Date().toISOString())
@@ -23,14 +18,14 @@ function computeHealthScore(
   const monthlyExpenses = expenses.filter((e) => monthKey(e.date) === thisMonth).reduce((s, e) => s + e.amount, 0)
   const savingsRate = monthlyIncome > 0 ? (monthlyIncome - monthlyExpenses) / monthlyIncome : 0
   const expenseRatio = monthlyIncome > 0 ? monthlyExpenses / monthlyIncome : 1
-  const overdueBills = bills.filter((b) => b.status === 'overdue').length
+  const unpaidCommitments = commitments.filter((c) => c.lastPaidMonth !== thisMonth).length
   const totalSaved = savings.reduce((s, g) => s + g.currentAmount, 0)
   const totalTargets = savings.reduce((s, g) => s + g.targetAmount, 0)
 
   let score = 50
   score += Math.max(-25, Math.min(25, savingsRate * 100 * 0.6))
   score += Math.max(-15, Math.min(15, (1 - expenseRatio) * 20))
-  score -= Math.min(20, overdueBills * 7)
+  score -= Math.min(20, unpaidCommitments * 5)
   if (totalTargets > 0) score += Math.min(10, (totalSaved / totalTargets) * 10)
   score = Math.max(0, Math.min(100, Math.round(score)))
 
@@ -44,8 +39,8 @@ function computeHealthScore(
   else if (savingsRate > 0) recommendations.push('Aim to raise your savings rate toward 20% of income.')
   else if (monthlyIncome > 0) warnings.push('You are spending more than you earn this month.')
 
-  if (overdueBills > 0) warnings.push(`${overdueBills} overdue bill${overdueBills > 1 ? 's' : ''} need attention.`)
-  else strengths.push('No overdue bills — great payment consistency.')
+  if (unpaidCommitments > 0) warnings.push(`${unpaidCommitments} commitment${unpaidCommitments > 1 ? 's' : ''} not yet marked paid this month.`)
+  else if (commitments.length > 0) strengths.push('All commitments marked paid this month.')
 
   if (expenseRatio < 0.7 && monthlyIncome > 0) strengths.push('Healthy expense-to-income ratio.')
   else if (monthlyIncome > 0) recommendations.push('Review discretionary spending to lower your expense ratio.')
@@ -63,13 +58,11 @@ const REPORT_TYPES = [
   'Income vs Expenses',
   'Spending Analysis',
   'Savings Progress',
-  'Bills & Commitments',
-  'Subscription Analysis',
+  'Commitments',
   'Monthly Grab Report',
   '6-Month Performance Report',
   'Vehicle Cost',
   'Document Expiry',
-  'AI Monthly Review',
 ]
 
 export default function Reports() {
@@ -77,17 +70,17 @@ export default function Reports() {
   const currency = profile?.currency ?? 'MYR'
   const income = useCollection<Income>('income', 'date')
   const expenses = useCollection<Expense>('expenses', 'date')
-  const bills = useCollection<Bill>('bills', 'dueDate')
+  const commitments = useCollection<Commitment>('commitments', 'createdAt')
   const savings = useCollection<SavingsGoal>('savings', 'targetDate')
   const grabSessions = useCollection<GrabSession>('grabSessions', 'date')
 
-  const loading = income.loading || expenses.loading || bills.loading || savings.loading || grabSessions.loading
+  const loading = income.loading || expenses.loading || commitments.loading || savings.loading || grabSessions.loading
 
   const grabAgg = useMemo(() => aggregateSessions(thisMonthSessions(grabSessions.data)), [grabSessions.data])
 
   const health = useMemo(
-    () => computeHealthScore(income.data, expenses.data, bills.data, savings.data),
-    [income.data, expenses.data, bills.data, savings.data]
+    () => computeHealthScore(income.data, expenses.data, commitments.data, savings.data),
+    [income.data, expenses.data, commitments.data, savings.data]
   )
 
   const ratingColor =
@@ -197,8 +190,7 @@ export default function Reports() {
             expenses.data.reduce((s, e) => s + e.amount, 0),
             currency
           )}{' '}
-          in total expenses logged). Full PDF export can be wired up via a Cloud Function that renders each report
-          server-side.
+          in total expenses logged). Full PDF export isn't available in this build — see README.
         </p>
       </div>
     </div>

@@ -79,15 +79,12 @@ async function main() {
     add('expenses', { category, amount, description, date: daysAgo(daysBack) })
   )
 
-  // Bills
-  add('bills', { name: 'Internet', amount: 129, dueDate: daysFromNow(5), frequency: 'monthly', status: 'upcoming', autoPayment: true })
-  add('bills', { name: 'Credit card', amount: 450, dueDate: daysAgo(2), frequency: 'monthly', status: 'overdue', autoPayment: false })
-  add('bills', { name: 'Car insurance', amount: 980, dueDate: daysFromNow(45), frequency: 'yearly', status: 'upcoming', autoPayment: false })
-
-  // Subscriptions
-  add('subscriptions', { service: 'Netflix', amount: 45, billingCycle: 'monthly', nextBillingDate: daysFromNow(9), category: 'Entertainment' })
-  add('subscriptions', { service: 'Spotify', amount: 15, billingCycle: 'monthly', nextBillingDate: daysFromNow(3), category: 'Entertainment' })
-  add('subscriptions', { service: 'iCloud+', amount: 12, billingCycle: 'yearly', nextBillingDate: daysFromNow(200), category: 'Utilities' })
+  // Commitments (unified — replaces the old separate bills/subscriptions demo data)
+  add('commitments', { title: 'House Loan', category: 'Housing', amount: 2818, paymentDay: 1, notes: '' })
+  add('commitments', { title: 'Car Financing', category: 'Car', amount: 1048, paymentDay: 5, notes: '' })
+  add('commitments', { title: 'TNB Electricity', category: 'Utilities', amount: 300, paymentDay: 15, notes: '' })
+  add('commitments', { title: 'Netflix', category: 'Subscription', amount: 45, paymentDay: 9, notes: '' })
+  add('commitments', { title: 'Family Insurance', category: 'Insurance', amount: 851, paymentDay: 20, notes: '' })
 
   // Savings
   add('savings', { goal: 'Emergency fund', targetAmount: 20000, currentAmount: 8500, targetDate: daysFromNow(300) })

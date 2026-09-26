@@ -16,11 +16,9 @@ Cloud Functions, no Firebase Storage, no paid AI API required.
 
 | Area | What it does |
 |---|---|
-| Dashboard | Salary, Fixed Commitments, Variable Expenses, Grab Gross/Net, Available Cash, Savings, Net Worth — plus a 3/6/12-month chart |
-| Drive Smart AI | Calculation-based advisor covering both general finances and Grab-specific questions (target progress, Saturday vs Sunday, RM/hour) |
-| Money | Income and variable expense tracking by category |
-| Commitments (Bills) | Your fixed monthly commitments — house, car, insurance, etc. |
-| Subscriptions | Recurring services |
+| Dashboard | One Monthly Balance figure (Income − Commitments − Expenses, plus Grab net), Commitment Status progress, Grab snapshot, Net Worth, 6-month net trend |
+| Money | Day-to-day variable income and expense tracking by category |
+| Commitments | **Unified** — every recurring monthly obligation (loans, subscriptions, insurance, utilities...) in one simple list. Amount is editable any month; "paid" status auto-resets each new month |
 | Savings | Goals, what-if scenarios by Grab-gross assumption, and a toggleable Future Rental Scenario |
 | **Grab Driver** | New module — Performance hub, fast session entry, history, Saturday-vs-Sunday analytics, area/long-ride analytics, manual demand log, fuel wallet, target planner |
 | **Assets** | Property, vehicles, investments, cash — feeds Net Worth |
@@ -62,10 +60,9 @@ Same reasoning as the LifePilot build this evolved from:
 - **Firebase Storage** now requires Blaze even for $0 usage, so
   Documents tracks records (name/category/expiry/notes) without file
   uploads.
-- **Drive Smart AI** is calculation-based (`src/ai/localAdvisor.ts`),
-  matching your question against known patterns and computing a real
-  answer from your own already-loaded data — no Gemini call, no API
-  key, no cost, and it never guarantees future earnings.
+- There is no AI Advisor in this build — removed for simplicity per
+  request; the Dashboard, Commitments, and Grab pages do all the
+  calculation work directly, with no external AI call either way.
 
 ---
 
@@ -168,28 +165,27 @@ npm run build             # tsc -b && vite build → dist/
 |---|---|---|
 | Can User A read User B's Grab sessions / assets / liabilities? | No — every new collection follows the same `request.auth.uid == uid` owner-only rule as the original LifePilot collections. |
 | Can the admin read Grab sessions, financial settings, or net worth data? | No — no admin rule exists for `grabSessions`, `grabTrips`, `demandObservations`, `fuelLogs`, `assets`, `liabilities`, or `settings`. |
-| Can a user set `isAdmin` on themselves? | No — unchanged from LifePilot; the owner-update rule rejects it. |
-| Can frontend JS access AI provider credentials? | N/A — Drive Smart AI is local calculation, no external call. |
+| Can a user set `isAdmin` on themselves? | No — the owner-update rule rejects any client-submitted change to it; only a direct Firebase Console edit can. |
 | Is "Live Demand" ever scraped or automated? | No — `demandObservations` is manual-entry only, by design, and the UI always labels it "manual demand observation". |
 
 ---
 
 ## 11. Known limitations
 
-- **Fixed Commitments assumed constant across the historical chart** —
-  the Dashboard's 3/6/12-month chart applies your *current* total
-  monthly commitments to every past month shown, since Bills doesn't
-  track a history of amount changes over time.
-- **Net Worth / Savings shown as a flat snapshot on the trend chart** —
-  Assets and Liabilities are point-in-time; there's no historical
-  net-worth tracking yet, so those two trend options repeat the current
-  figure across the period (noted in-app).
-- **Demo seed script not yet updated for Grab/Assets/Liabilities data**
-  — `scripts/seedDemoData.ts` still seeds the original LifePilot
-  categories only.
-- Everything inherited from the original LifePilot build still applies
-  too: no file attachments (Storage requires Blaze), no PDF/CSV export,
-  no auto-generated notifications, calculation-based (not LLM-based) AI.
+- **Commitments total assumed constant across the 6-month trend chart**
+  — the Dashboard's trend chart applies your *current* total monthly
+  commitments to every past month shown, since individual commitment
+  amounts aren't tracked historically (each commitment just has one
+  current `amount`, editable any time).
+- **Net Worth is a live snapshot, not a history** — Assets and
+  Liabilities are point-in-time; there's no month-by-month net-worth
+  tracking yet.
+- **Demo seed script covers Commitments but not yet Grab/Assets/
+  Liabilities data** — `scripts/seedDemoData.ts` seeds income,
+  expenses, commitments, savings, tasks and a vehicle; Grab sessions,
+  assets and liabilities aren't included yet.
+- No AI Advisor (removed by request), no file attachments (Storage
+  requires Blaze), no PDF/CSV export, no auto-generated notifications.
 
 ---
 

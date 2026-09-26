@@ -70,36 +70,29 @@ export interface Expense {
   updatedAt: string
 }
 
-// ── Bills ────────────────────────────────────────────────────────
+// ── Commitments (unified — replaces the old separate Bills and ──
+// Subscriptions concepts, which overlapped and caused confusion) ────
+//
+// A commitment is any recurring MONTHLY obligation — a loan, a
+// subscription, insurance, utilities, etc. Its `amount` is simply the
+// current amount and can be edited any month (rent goes up, a plan
+// changes price...). Paid status is tracked for THIS month only via
+// `lastPaidMonth`: the UI computes "paid" by comparing that to the
+// current month, so it naturally resets to "unpaid" every new month
+// without needing any scheduled job.
 
-export type BillStatus = 'upcoming' | 'paid' | 'overdue'
-export type BillFrequency = 'one-off' | 'weekly' | 'monthly' | 'quarterly' | 'yearly'
+export const COMMITMENT_CATEGORIES = ['Car', 'Loan', 'Housing', 'Utilities', 'Insurance', 'Subscription', 'Family', 'Other'] as const
+export type CommitmentCategory = (typeof COMMITMENT_CATEGORIES)[number]
 
-export interface Bill {
+export interface Commitment {
   id: string
-  name: string
+  title: string
+  category: CommitmentCategory
   amount: number
-  dueDate: string
-  frequency: BillFrequency
-  status: BillStatus
-  autoPayment: boolean
-  notes?: string
-  createdAt: string
-  updatedAt: string
-}
-
-// ── Subscriptions ────────────────────────────────────────────────
-
-export type BillingCycle = 'monthly' | 'yearly'
-
-export interface Subscription {
-  id: string
-  service: string
-  amount: number
-  billingCycle: BillingCycle
-  nextBillingDate: string
-  category: string
-  notes?: string
+  paymentDay: number // day of month, 1-31
+  lastPaidMonth?: string // 'YYYY-MM' of the most recent month marked paid
+  lastPaidDate?: string // ISO date it was marked paid
+  notes: string
   createdAt: string
   updatedAt: string
 }
@@ -267,7 +260,7 @@ export interface GrabSession {
   startTime: string // "HH:mm"
   endTime: string // "HH:mm"
   onlineHours: number
-  drivingHours?: number
+  drivingHours: number // 0 when not provided — never `undefined` (Firestore rejects that)
   trips: number
   totalKm: number
   grossEarnings: number
@@ -277,7 +270,7 @@ export interface GrabSession {
   toll: number
   parking: number
   otherExpenses: number
-  notes?: string
+  notes: string // '' when not provided — never `undefined`
   createdAt: string
   updatedAt: string
 }

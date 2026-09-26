@@ -8,10 +8,8 @@ import Login from '@/pages/Login'
 import Register from '@/pages/Register'
 import PendingApproval from '@/pages/PendingApproval'
 import Dashboard from '@/pages/Dashboard'
-import AIAdvisor from '@/pages/AIAdvisor'
 import Money from '@/pages/Money'
-import Bills from '@/pages/Bills'
-import Subscriptions from '@/pages/Subscriptions'
+import Commitments from '@/pages/Commitments'
 import Savings from '@/pages/Savings'
 import LifeAdmin from '@/pages/LifeAdmin'
 import Documents from '@/pages/Documents'
@@ -49,10 +47,8 @@ export default function App() {
               }
             >
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/ai-advisor" element={<AIAdvisor />} />
               <Route path="/money" element={<Money />} />
-              <Route path="/bills" element={<Bills />} />
-              <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/commitments" element={<Commitments />} />
               <Route path="/savings" element={<Savings />} />
               <Route path="/grab" element={<GrabHub />} />
               <Route path="/grab/session" element={<GrabSessionForm />} />

@@ -10,10 +10,10 @@ import CurrencyInput from '@/components/CurrencyInput'
 import { TextField, FieldRow } from '@/components/FormField'
 import { LoadingState, EmptyState } from '@/components/States'
 import { useToast } from '@/components/Toast'
-import { formatCurrency, formatDate, daysUntil, classNames, monthlyEquivalent } from '@/utils/format'
+import { formatCurrency, formatDate, daysUntil, classNames } from '@/utils/format'
 import { monthKey } from '@/utils/grab'
 import { DEFAULT_FINANCIAL_SETTINGS } from '@/types'
-import type { SavingsGoal, Bill, Expense, FinancialSettings } from '@/types'
+import type { SavingsGoal, Commitment, Expense, FinancialSettings } from '@/types'
 
 type Tab = 'goals' | 'scenarios'
 
@@ -127,7 +127,7 @@ function GoalsPanel({ currency }: { currency: string }) {
 }
 
 function ScenariosPanel({ currency }: { currency: string }) {
-  const bills = useCollection<Bill>('bills', 'dueDate')
+  const commitments = useCollection<Commitment>('commitments', 'createdAt')
   const expenses = useCollection<Expense>('expenses', 'date')
   const settings = useSettingsDoc<FinancialSettings>('financial', DEFAULT_FINANCIAL_SETTINGS)
   const { push } = useToast()
@@ -135,7 +135,7 @@ function ScenariosPanel({ currency }: { currency: string }) {
   const [futureForm, setFutureForm] = useState(settings.data.futureScenario)
   useEffect(() => setFutureForm(settings.data.futureScenario), [settings.data.futureScenario])
 
-  const fixedCommitments = useMemo(() => bills.data.reduce((s, b) => s + monthlyEquivalent(b.amount, b.frequency), 0), [bills.data])
+  const fixedCommitments = useMemo(() => commitments.data.reduce((s, c) => s + c.amount, 0), [commitments.data])
   const thisMonth = monthKey(new Date().toISOString())
   const variableExpenses = useMemo(
     () => expenses.data.filter((e) => monthKey(e.date) === thisMonth).reduce((s, e) => s + e.amount, 0),
@@ -172,7 +172,7 @@ function ScenariosPanel({ currency }: { currency: string }) {
 
   const futureNet = futureForm.rentalIncome - futureForm.newRentPaid - futureForm.securityFee
 
-  if (bills.loading || expenses.loading || settings.loading) return <LoadingState />
+  if (commitments.loading || expenses.loading || settings.loading) return <LoadingState />
 
   return (
     <div className="space-y-6">

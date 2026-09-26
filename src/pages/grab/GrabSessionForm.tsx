@@ -79,7 +79,7 @@ export default function GrabSessionForm() {
         startTime: form.startTime,
         endTime: form.endTime,
         onlineHours,
-        drivingHours: form.drivingHours || undefined,
+        drivingHours: form.drivingHours,
         trips: form.trips,
         totalKm: form.totalKm,
         grossEarnings: form.grossEarnings,
@@ -89,7 +89,7 @@ export default function GrabSessionForm() {
         toll: form.toll,
         parking: form.parking,
         otherExpenses: form.otherExpenses,
-        notes: form.notes || undefined,
+        notes: form.notes,
       })
       push('Session saved.', 'success')
       navigate('/grab/history')
